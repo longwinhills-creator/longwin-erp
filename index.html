@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>瀧飲山丘營運系統</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .portal { display: grid; gap: 14px; }
+  .portal .row2 { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 640px) { .portal .row2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .door {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: center;
+    padding: 18px; text-decoration: none; color: var(--ink);
+    background: var(--paper-2); border: 1px solid var(--rule); border-radius: var(--radius);
+  }
+  .door:hover { border-color: var(--rule-strong); background: var(--paper); }
+  .door .seal { width: 54px; height: 54px; font-size: 32px; transform: none; }
+  .door h2 { margin: 0; font: 600 var(--step-2)/1.25 var(--f-head); letter-spacing: .08em; }
+  .door p { margin: 2px 0 0; font-size: var(--step--1); color: var(--ink-3); }
+  .door .status { font-size: var(--step--1); color: var(--ink-2); text-align: right; display: grid; gap: 4px; justify-items: end; }
+  .door.core { border: 1px solid var(--rule-strong); box-shadow: inset 0 0 0 4px var(--paper-2), inset 0 0 0 5px var(--rule); padding: 24px; }
+  .door.core .seal { width: 66px; height: 66px; font-size: 40px; }
+  .door.core h2 { font-size: var(--step-3); }
+  @media (max-width: 520px) {
+    .door { grid-template-columns: auto minmax(0, 1fr); }
+    .door .status { grid-column: 1 / -1; justify-items: start; text-align: left; }
+  }
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: var(--step--1); color: var(--ink-2); }
+  .flow b { font: 400 var(--step-0) var(--f-display); color: var(--ink); padding: 2px 10px; border: 1px solid var(--rule-strong); border-radius: 2px; background: var(--paper-2); }
+  .flow span { color: var(--ink-3); }
+</style>
+</head>
+<body>
+<div id="plaque"></div>
+<main class="wrap">
+  <div class="grid">
+    <section class="sec">
+      <header><h2>選擇據點<small>總部是所有資料的匯集中心</small></h2><span class="aside" id="today"></span></header>
+      <div class="portal" id="doors"></div>
+    </section>
+
+    <section class="sec">
+      <header><h2>物料怎麼流動</h2></header>
+      <div class="panel inset">
+        <div class="flow"><b>廠商</b><span>入庫 →</span><b>總部倉庫</b><span>撥補 →</span><b>門店</b><span>銷售耗用 →</span><b>POS</b></div>
+        <div class="flow" style="margin-top:10px"><b>總部倉庫</b><span>原料領用 →</span><b>中央工廠</b><span>仙草凍配送 →</span><b>門店</b></div>
+        <div class="flow" style="margin-top:10px"><b>廠商</b><span>直送（不經倉庫）→</span><b>門店</b></div>
+        <p class="note">每一筆移動都記在同一本庫存異動帳，各據點獨立作業，帳是串在一起的。</p>
+      </div>
+    </section>
+
+    <section class="sec">
+      <header><h2>舊系統</h2></header>
+      <div class="row">
+        <a class="btn ghost" href="https://galaxyfoeytk.github.io/tailong-store/?store=xueshi" target="_blank" rel="noopener">學士店舊系統</a>
+        <a class="btn ghost" href="https://galaxyfoeytk.github.io/tailong-store/?store=changping" target="_blank" rel="noopener">昌平店舊系統</a>
+      </div>
+      <p class="note">新系統的模組完成前，溫度、仙草凍、收班等作業照舊在原系統操作。</p>
+    </section>
+  </div>
+</main>
+<div id="foot"></div>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  ERP.header({ code: 'portal', seal: '山', title: '瀧飲山丘', sub: '總部・倉庫・中央工廠・門店 營運系統' });
+  ERP.footer();
+  ERP.$('#today').textContent = '示意日 ' + ERP.DAY;
+
+  var pending = ERP.TRANSFERS.filter(function (t) { return t.status === '已申請'; }).length;
+  var whAlerts = ERP.WAREHOUSE.filter(function (it) { return ERP.whStatus(it).state !== 'ok'; }).length;
+  var xs = ERP.pnl('xueshi'), cp = ERP.pnl('changping');
+  var F = ERP.FACTORY;
+
+  function door(code, cls, status) {
+    var L = ERP.loc(code);
+    return '<a class="door ' + (cls || '') + '" href="' + L.href + '">' +
+      '<div class="seal" aria-hidden="true">' + L.seal + '</div>' +
+      '<div><h2>' + L.name + '</h2><p>' + L.role + '</p></div>' +
+      '<div class="status">' + status + '</div></a>';
+  }
+  ERP.$('#doors').innerHTML =
+    door('hq', 'core', ERP.chip(pending ? 'warn' : 'ok', pending + ' 張撥補單待審核') + ERP.chip(whAlerts ? 'warn' : 'ok', whAlerts + ' 項倉庫庫存偏低')) +
+    '<div class="row2">' +
+      door('wh', '', ERP.chip(whAlerts ? 'warn' : 'ok', whAlerts + ' 項需叫貨')) +
+      door('cf', '', '<span>工廠庫存 ' + F.stockKg + ' 公斤</span>') +
+    '</div>' +
+    '<div class="row2">' +
+      door('xueshi', '', '<span>今日 ' + ERP.money(xs.revenue) + '・' + xs.cups + ' 杯</span>') +
+      door('changping', '', '<span>今日 ' + ERP.money(cp.revenue) + '・' + cp.cups + ' 杯</span>') +
+    '</div>';
+})();
+</script>
+</body>
+</html>

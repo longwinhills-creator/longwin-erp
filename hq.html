@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>總部｜瀧飲山丘</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .pl td:first-child { color: var(--ink-2); }
+  .pl tr.sub td { font-weight: 600; color: var(--ink); background: var(--paper-3); }
+  .pl tr.sub td:first-child { color: var(--ink); }
+  .pl tr.ded td:first-child { padding-left: 22px; }
+  .countdown { font: 600 var(--step-3)/1.1 var(--f-head); }
+</style>
+</head>
+<body>
+<div id="plaque"></div>
+<main class="wrap">
+  <div class="grid">
+    <section class="sec">
+      <header><h2>今日總覽<small id="dayLabel"></small></h2><span class="aside">兩店合計・系統估算值</span></header>
+      <dl class="figs" id="figs"></dl>
+    </section>
+
+    <div class="grid two">
+      <div class="stack">
+        <section class="sec">
+          <header>
+            <h2>現場損益表<small>M1</small></h2>
+            <div class="seg" role="group" aria-label="期間">
+              <button type="button" id="p-day" aria-pressed="true">日</button>
+              <button type="button" id="p-week" aria-pressed="false">週</button>
+              <button type="button" id="p-month" aria-pressed="false" disabled title="累積一個月資料後開放">月</button>
+            </div>
+          </header>
+          <div class="panel tbl-wrap"><table class="ledger pl" id="plTable"></table></div>
+          <p class="note" id="plNote"></p>
+        </section>
+
+        <section class="sec">
+          <header><h2>系統值與人工值比對</h2><span class="aside">差異超過 3% 或 $300 標示</span></header>
+          <div class="panel tbl-wrap"><table class="ledger" id="diffTable"></table></div>
+        </section>
+
+        <section class="sec">
+          <header><h2>近 7 日營業額</h2><span class="aside">滑過圖表看每日數字</span></header>
+          <div class="panel" id="weekChart"></div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="sec">
+          <header><h2>待處理</h2></header>
+          <div class="panel"><ul class="list" id="todo"></ul></div>
+        </section>
+
+        <section class="sec">
+          <header><h2>撥補單流程<small>M2</small></h2></header>
+          <div class="steps" id="trSteps"></div>
+          <p class="note">建議 → 店長確認 → 總部審核 → 倉庫出貨 → 門店收貨</p>
+        </section>
+
+        <section class="sec">
+          <header><h2>月底盤點<small>M5</small></h2></header>
+          <div class="panel">
+            <div class="muted small">下次帳面快照</div>
+            <div class="countdown" id="meWhen"></div>
+            <div class="small muted" id="meLeft"></div>
+            <ul class="list small" style="margin-top:8px">
+              <li><span>21:15</span><span>系統自動結算帳面庫存</span></li>
+              <li><span>21:30</span><span>門店第一次盤點（盤點 A）</span></li>
+              <li><span>隔日 09:00</span><span>門店第二次盤點（盤點 B）</span></li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="sec">
+          <header><h2>中央工廠今日</h2><a class="aside" href="factory.html">進入工廠</a></header>
+          <div class="panel"><ul class="list" id="cfToday"></ul></div>
+        </section>
+
+        <section class="sec">
+          <header><h2>中央工廠成本<small>M8・本月累計</small></h2></header>
+          <div class="panel tbl-wrap"><table class="ledger" id="cfCost"></table></div>
+          <p class="note">每公斤全成本套用到門店的仙草凍食材成本，工廠費用不在門店重複扣。</p>
+        </section>
+      </div>
+    </div>
+
+    <section class="sec">
+      <header><h2>總部模組</h2><span class="aside">依設計書順序逐步開放</span></header>
+      <div class="tiles" id="mods"></div>
+    </section>
+  </div>
+</main>
+<div id="foot"></div>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  var E = ERP;
+  E.header({ code: 'hq', title: '總部', sub: '主檔、參數、審核、報表的中心' });
+  E.footer();
+  E.$('#dayLabel').textContent = '示意日 ' + E.DAY;
+
+  var xs = E.pnl('xueshi'), cp = E.pnl('changping');
+  var revenue = xs.revenue + cp.revenue, cups = xs.cups + cp.cups, profit = xs.profit + cp.profit;
+  var prevRev = E.WEEK.xueshi[5] + E.WEEK.changping[5];
+  var pending = E.TRANSFERS.filter(function (t) { return t.status === '已申請'; }).length;
+  var whAlerts = E.WAREHOUSE.filter(function (it) { return E.whStatus(it).state !== 'ok'; });
+
+  var chg = (revenue - prevRev) / prevRev;
+  E.$('#figs').innerHTML =
+    '<div class="fig"><dt>營業額</dt><dd>' + E.money(revenue) + '</dd><span class="delta ' + (chg >= 0 ? 'up' : 'down') + '">較前日 ' + (chg >= 0 ? '＋' : '−') + E.pct(Math.abs(chg)) + '</span></div>' +
+    '<div class="fig"><dt>杯數</dt><dd>' + E.num(cups) + '<small>杯</small></dd><span class="delta">杯單價 ' + E.money(revenue / cups) + '</span></div>' +
+    '<div class="fig"><dt>現場淨利</dt><dd>' + E.money(profit) + '</dd><span class="delta">淨利率 ' + E.pct(profit / revenue) + '</span></div>' +
+    '<div class="fig"><dt>主要成本率</dt><dd>' + E.pct((xs.food + xs.pack + cp.food + cp.pack + xs.labor + cp.labor) / revenue) + '</dd><span class="delta">食材＋包材＋人事</span></div>';
+
+  // ── 損益表 ──
+  var period = 'day';
+  function scaled(p, code) {
+    if (period === 'day') return p;
+    var weekRev = E.WEEK[code].reduce(function (a, b) { return a + b; }, 0);
+    var k = weekRev / p.revenue, out = {};
+    Object.keys(p).forEach(function (key) { out[key] = typeof p[key] === 'number' ? p[key] * k : p[key]; });
+    out.fixed = p.fixed * 7; out.margin = p.margin; out.revenue = weekRev;
+    out.profit = out.gross - out.labor - out.elec - out.fixed; out.margin = out.profit / weekRev;
+    return out;
+  }
+  function renderPL() {
+    var a = scaled(xs, 'xueshi'), b = scaled(cp, 'changping');
+    var rows = [
+      ['營業額（含稅）', 'revenue', ''],
+      ['營業稅 5%', 'tax', 'ded'], ['熊貓抽成', 'pandaFee', 'ded'], ['LINE Pay 手續費', 'payFee', 'ded'],
+      ['淨營收', 'net', 'sub'],
+      ['食材成本', 'food', 'ded'], ['包材成本', 'pack', 'ded'],
+      ['毛利', 'gross', 'sub'],
+      ['人事成本', 'labor', 'ded'], ['電費', 'elec', 'ded'], ['固定費用' + (period === 'day' ? '日攤' : '攤提'), 'fixed', 'ded'],
+      ['現場淨利', 'profit', 'total']
+    ];
+    var neg = { tax: 1, pandaFee: 1, payFee: 1, food: 1, pack: 1, labor: 1, elec: 1, fixed: 1 };
+    var html = '<thead><tr><th>科目</th><th class="n">學士店</th><th class="n">昌平店</th><th class="n">合計</th></tr></thead><tbody>';
+    rows.forEach(function (r) {
+      var k = r[1], s = neg[k] ? -1 : 1;
+      html += '<tr class="' + r[2] + '"><td>' + r[0] + '</td><td class="n">' + E.money(s * a[k]) + '</td><td class="n">' + E.money(s * b[k]) + '</td><td class="n">' + E.money(s * (a[k] + b[k])) + '</td></tr>';
+    });
+    html += '<tr><td>淨利率</td><td class="n">' + E.pct(a.margin) + '</td><td class="n">' + E.pct(b.margin) + '</td><td class="n">' + E.pct((a.profit + b.profit) / (a.revenue + b.revenue)) + '</td></tr>';
+    E.$('#plTable').innerHTML = html + '</tbody>';
+    E.$('#plNote').textContent = period === 'day'
+      ? '仙草凍以中央工廠每公斤全成本計入食材。費率與固定費用為示意值，正式數字由參數表設定。'
+      : '週報由每日損益加總（示意：以當日成本結構推算近 7 日）。';
+  }
+  ['day', 'week'].forEach(function (p) {
+    E.$('#p-' + p).addEventListener('click', function () {
+      period = p;
+      ['day', 'week', 'month'].forEach(function (q) { E.$('#p-' + q).setAttribute('aria-pressed', q === p ? 'true' : 'false'); });
+      renderPL();
+    });
+  });
+  renderPL();
+
+  // ── 系統值與人工值 ──
+  function diffRow(store, item, sys, man) {
+    if (man == null) return '<tr><td class="name">' + store + '</td><td>' + item + '</td><td class="n">' + sys + '</td><td class="n muted">未輸入</td><td>' + E.chip('idle', '待核對') + '</td></tr>';
+    var d = man - sys.raw, rate = sys.raw ? Math.abs(d) / sys.raw : 0;
+    var state = Math.abs(d) < 0.5 ? 'ok' : (rate > 0.03 || Math.abs(d) > 300 ? 'bad' : 'warn');
+    var label = state === 'ok' ? '一致' : '差 ' + (d > 0 ? '＋' : '−') + sys.fmt(Math.abs(d));
+    return '<tr><td class="name">' + store + '</td><td>' + item + '</td><td class="n">' + sys.fmt(sys.raw) + '</td><td class="n">' + sys.fmt(man) + '</td><td>' + E.chip(state, label) + '</td></tr>';
+  }
+  function m(v) { return { raw: v, fmt: function (x) { return E.money(x); }, toString: function () { return E.money(v); } }; }
+  function h(v) { return { raw: v, fmt: function (x) { return E.num(x, 1) + ' 小時'; }, toString: function () { return E.num(v, 1) + ' 小時'; } }; }
+  var XM = E.STORE_DAY.xueshi.manual, CM = E.STORE_DAY.changping.manual;
+  E.$('#diffTable').innerHTML = '<thead><tr><th>門店</th><th>科目</th><th class="n">系統值</th><th class="n">人工值</th><th>狀態</th></tr></thead><tbody>' +
+    diffRow('學士店', '營業額', m(xs.revenue), XM.revenue) +
+    diffRow('學士店', '熊貓抽成', m(xs.pandaFee), XM.panda) +
+    diffRow('學士店', 'LINE Pay 手續費', m(xs.payFee), XM.linePay) +
+    diffRow('學士店', '人員時數', h(E.STORE_DAY.xueshi.hours), XM.hours) +
+    diffRow('昌平店', '營業額', m(cp.revenue), CM.revenue) +
+    diffRow('昌平店', '熊貓抽成', m(cp.pandaFee), CM.panda) +
+    diffRow('昌平店', '人員時數', h(E.STORE_DAY.changping.hours), CM.hours) +
+    '</tbody>';
+
+  // ── 圖表 ──
+  E.lineChart(E.$('#weekChart'), {
+    labels: E.WEEK.labels, label: '學士店與昌平店近 7 日營業額',
+    series: [
+      { name: '學士店', color: 'var(--s1)', values: E.WEEK.xueshi },
+      { name: '昌平店', color: 'var(--s2)', values: E.WEEK.changping }
+    ],
+    fmt: function (v) { return E.money(v); },
+    fmtAxis: function (v) { return v ? (v / 1000) + 'k' : '0'; }
+  });
+
+  // ── 待處理 ──
+  var lowStores = [];
+  ['xueshi', 'changping'].forEach(function (c) {
+    E.STORE_STOCK[c].forEach(function (s) { if (s.book < s.safe) lowStores.push(E.loc(c).name + '・' + s.name); });
+  });
+  var todo = [];
+  if (pending) todo.push(['warn', '撥補單待審核', pending + ' 張，店長已確認數量', '審核']);
+  if (whAlerts.length) todo.push(['warn', '倉庫需叫貨', whAlerts.map(function (w) { return w.name; }).join('、'), '查看']);
+  if (lowStores.length) todo.push(['bad', '門店低於安全庫存', lowStores.join('、'), '查看']);
+  todo.push(['idle', '昌平店熊貓對帳未輸入', '人工值空白，無法比對', '提醒']);
+  E.$('#todo').innerHTML = todo.map(function (t) {
+    return '<li><div class="main">' + E.chip(t[0], t[1]) + '<p>' + E.esc(t[2]) + '</p></div><div class="end"><button class="btn ghost" type="button" data-t="' + E.esc(t[1]) + '">' + t[3] + '</button></div></li>';
+  }).join('');
+  E.$('#todo').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (b) E.toast('「' + b.dataset.t + '」的處理頁面建置中');
+  });
+
+  // ── 撥補流程 ──
+  E.$('#trSteps').innerHTML = E.TR_FLOW.map(function (s) {
+    var n = E.TRANSFERS.filter(function (t) { return t.status === s; }).length;
+    return '<div class="' + (s === '已申請' && n ? 'hot' : '') + '"><b>' + n + '</b><span>' + s + '</span></div>';
+  }).join('');
+
+  // ── 月底 ──
+  var me = E.nextMonthEnd();
+  E.$('#meWhen').textContent = (me.getMonth() + 1) + '/' + me.getDate() + ' 21:15';
+  var ms = me - new Date(), d = Math.floor(ms / 864e5), hr = Math.floor(ms % 864e5 / 36e5);
+  E.$('#meLeft').textContent = '還有 ' + d + ' 天 ' + hr + ' 小時';
+
+  // ── 工廠 ──
+  var F = E.FACTORY, c = F.cost;
+  var perKg = (c.material + c.labor + c.elec + c.freight + c.vehicle + c.other) / c.outputKg;
+  var delivered = F.deliveries.reduce(function (s, x) { return s + x.kg; }, 0);
+  E.$('#cfToday').innerHTML =
+    '<li><span>工廠庫存</span><b>' + F.stockKg + ' 公斤</b></li>' +
+    '<li><span>今日配送</span><b>' + delivered + ' 公斤</b></li>' +
+    '<li><span>本月報廢</span><b>' + F.waste.reduce(function (s, w) { return s + w.kg; }, 0) + ' 公斤</b></li>' +
+    '<li><span>每公斤全成本（本月）</span><b>' + E.money(perKg) + '</b></li>';
+
+  var costRows = [['原料', c.material], ['人力', c.labor], ['電費', c.elec], ['運費', c.freight], ['車輛（保險、稅、保養攤提）', c.vehicle], ['其他固定', c.other]];
+  var totalCost = costRows.reduce(function (s, r) { return s + r[1]; }, 0);
+  E.$('#cfCost').innerHTML = '<tbody>' + costRows.map(function (r) {
+    return '<tr><td>' + r[0] + '</td><td class="n">' + E.money(r[1]) + '</td><td class="n muted">' + E.pct(r[1] / totalCost) + '</td></tr>';
+  }).join('') +
+    '<tr class="total"><td>合計</td><td class="n">' + E.money(totalCost) + '</td><td></td></tr>' +
+    '<tr><td>本月產出</td><td class="n">' + E.num(c.outputKg) + ' 公斤</td><td></td></tr>' +
+    '<tr class="total"><td>每公斤全成本</td><td class="n">' + E.money(perKg) + '</td><td></td></tr></tbody>';
+
+  // ── 模組 ──
+  var mods = [
+    ['M1', '損益報表', '日、週、月報與人工比對'],
+    ['M2', '撥補審核', '依 POS 耗用產生建議'],
+    ['M3', '進存銷總帳', '倉庫、工廠、門店一本帳'],
+    ['M5', '月底盤點', '快照與兩次盤點比對'],
+    ['M7', '叫貨預估', '日均耗用 × 星期係數'],
+    ['M9', '月會報告', '可直接投影的經營指標'],
+    ['主檔', '品項與配方', '原料、產品、BOM'],
+    ['參數', '費用與費率', '皆有生效日，可修改']
+  ];
+  E.$('#mods').innerHTML = mods.map(function (m) {
+    return '<button type="button" class="tile soon" aria-disabled="true"><span class="code">' + m[0] + '・建置中</span><b>' + m[1] + '</b><span>' + m[2] + '</span></button>';
+  }).join('');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>中央工廠｜瀧飲山丘</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .calc { display: grid; gap: 0; font-size: var(--step--1); }
+  .calc > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px dashed var(--rule); }
+  .calc > div span:first-child { color: var(--ink-2); }
+  .calc .result { border-bottom: 0; border-top: 3px double var(--rule-strong); margin-top: 4px; padding-top: 10px; }
+  .calc .result b { font: 600 var(--step-3)/1 var(--f-head); }
+  .stage { font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="plaque"></div>
+<main class="wrap">
+  <div class="grid">
+    <section class="sec">
+      <header><h2>工廠概況<small id="dayLabel"></small></h2></header>
+      <dl class="figs" id="figs"></dl>
+    </section>
+
+    <div class="grid two">
+      <div class="stack">
+        <section class="sec">
+          <header><h2>今日建議煮製量<small>M4</small></h2><span class="aside">依各店預估杯數推算</span></header>
+          <div class="panel"><div class="calc" id="calc"></div></div>
+        </section>
+
+        <section class="sec">
+          <header><h2>煮製批次</h2><span class="aside">煮好 → 冷卻中 → 可配送 → 已配送</span></header>
+          <div class="panel tbl-wrap"><table class="ledger" id="batches"></table></div>
+        </section>
+
+        <section class="sec">
+          <header><h2>本次投料<small>自動從倉庫扣帳</small></h2></header>
+          <div class="panel"><ul class="list" id="feed"></ul></div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="sec">
+          <header><h2>今日配送</h2></header>
+          <div class="panel"><ul class="list" id="deliv"></ul></div>
+        </section>
+
+        <section class="sec">
+          <header><h2>報廢紀錄</h2></header>
+          <div class="panel"><ul class="list" id="waste"></ul></div>
+        </section>
+
+        <section class="sec">
+          <header><h2>工廠作業</h2></header>
+          <div class="tiles" id="ops"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+</main>
+<div id="foot"></div>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  var E = ERP, F = E.FACTORY, c = F.cost;
+  E.header({ code: 'cf', title: '中央工廠', sub: '現場作業：煮製、投料、配送、報廢' });
+  E.footer();
+  E.$('#dayLabel').textContent = '示意日 ' + E.DAY;
+
+  var totalCost = c.material + c.labor + c.elec + c.freight + c.vehicle + c.other;
+  var perKg = totalCost / c.outputKg;
+  var cups = F.forecastCups.xueshi + F.forecastCups.changping;
+  var demandKg = cups * F.gramsPerCup / 1000 * F.forecastDays;
+  var needKg = Math.max(0, demandKg + F.safetyKg - F.stockKg - F.readySoonKg);
+  var batches = Math.ceil(needKg / F.kgPerBatch);
+  var delivered = F.deliveries.reduce(function (s, x) { return s + x.kg; }, 0);
+  var wasteKg = F.waste.reduce(function (s, w) { return s + w.kg; }, 0);
+
+  E.$('#figs').innerHTML =
+    '<div class="fig"><dt>工廠庫存</dt><dd>' + F.stockKg + '<small>公斤</small></dd><span class="delta">另有 ' + F.readySoonKg + ' 公斤冷卻中</span></div>' +
+    '<div class="fig"><dt>今日建議煮製</dt><dd>' + batches + '<small>桶</small></dd><span class="delta">約 ' + E.num(batches * F.kgPerBatch) + ' 公斤</span></div>' +
+    '<div class="fig"><dt>今日配送</dt><dd>' + delivered + '<small>公斤</small></dd><span class="delta">' + F.deliveries.length + ' 家門店</span></div>' +
+    '<div class="fig"><dt>本月報廢率</dt><dd>' + E.pct(wasteKg / c.outputKg) + '</dd><span class="delta">本月報廢 ' + E.num(wasteKg, 1) + ' 公斤</span></div>';
+
+  E.$('#calc').innerHTML =
+    '<div><span>學士店預估（含仙草凍品項）</span><span>' + F.forecastCups.xueshi + ' 杯／日</span></div>' +
+    '<div><span>昌平店預估</span><span>' + F.forecastCups.changping + ' 杯／日</span></div>' +
+    '<div><span>× 每杯仙草凍 ' + F.gramsPerCup + ' 克 × ' + F.forecastDays + ' 天</span><span>' + E.num(demandKg, 1) + ' 公斤</span></div>' +
+    '<div><span>＋ 工廠安全庫存</span><span>' + F.safetyKg + ' 公斤</span></div>' +
+    '<div><span>− 工廠現有</span><span>' + F.stockKg + ' 公斤</span></div>' +
+    '<div><span>− 冷卻中待配送</span><span>' + F.readySoonKg + ' 公斤</span></div>' +
+    '<div class="result"><span>應煮 ' + E.num(needKg, 1) + ' 公斤，每桶約 ' + F.kgPerBatch + ' 公斤</span><b>' + batches + ' 桶</b></div>';
+
+  var stageState = { '冷卻中': 'warn', '可配送': 'ok', '已配送': 'idle' };
+  E.$('#batches').innerHTML = '<thead><tr><th>批號</th><th>桶號</th><th class="n">產出</th><th>煮好時間</th><th>狀態</th></tr></thead><tbody>' +
+    F.batches.map(function (b) {
+      return '<tr><td class="name">' + b.no + '</td><td>' + b.bucket + '</td><td class="n">' + E.num(b.kg, 1) + ' 公斤</td><td>' + b.cooked + '</td><td>' + E.chip(stageState[b.stage] || 'idle', b.stage) + '</td></tr>';
+    }).join('') + '</tbody>';
+
+  E.$('#feed').innerHTML = F.recipePerBatch.map(function (r) {
+    return '<li><span>' + r.name + '<span class="muted">（每桶 ' + r.qty + ' ' + r.unit + '）</span></span><b>' + E.num(r.qty * batches, 1) + ' ' + r.unit + '</b></li>';
+  }).join('') + '<li class="muted small">工廠配方待填，用量為示意。實際投料可在記錄時修改。</li>';
+
+  E.$('#deliv').innerHTML = F.deliveries.map(function (x) {
+    return '<li><div class="main"><b>' + E.loc(x.to).name + '・' + x.kg + ' 公斤</b><p>' + x.time + ' 出車</p></div><div class="end">' +
+      E.chip(x.state === '已送達' ? 'ok' : 'warn', x.state) + '</div></li>';
+  }).join('');
+
+
+  E.$('#waste').innerHTML = F.waste.map(function (w) {
+    return '<li><div class="main"><b>' + w.kg + ' 公斤</b><p>' + w.batch + '・' + w.reason + '</p></div><div class="end">' + E.chip('bad', '報廢') + '</div></li>';
+  }).join('') + '<li><span class="muted">本月報廢率</span><b>' + E.pct(wasteKg / c.outputKg) + '</b></li>';
+
+  var ops = [['記錄煮製', '投料、產出、桶號'], ['配送單', '工廠到門店'], ['報廢登記', '公斤數與原因'], ['工廠配方', '每桶投料標準'], ['工時與電表', '每次煮製的人力與度數']];
+  E.$('#ops').innerHTML = ops.map(function (o) {
+    return '<button type="button" class="tile soon" aria-disabled="true"><span class="code">建置中</span><b>' + o[0] + '</b><span>' + o[1] + '</span></button>';
+  }).join('');
+})();
+</script>
+</body>
+</html>

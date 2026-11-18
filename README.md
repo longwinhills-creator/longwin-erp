@@ -1,2 +1,7 @@
-# longwin-erp
-Longwin ERP frontend
+# 瀧飲山丘營運系統（前端）
+
+總部、學士店、昌平店、中央工廠、倉庫的作業入口。
+
+- 目前是**原型**，畫面上的數字都是示意資料。
+- 正式資料放在後端（Google Apps Script＋Google 試算表），登入與權限都在後端檢查。
+- 這個 repo 是公開的：**不要放任何密碼、金鑰、LINE Token 或其他機密**。

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>總部倉庫｜瀧飲山丘</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .lvl-cell { min-width: 140px; }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div id="plaque"></div>
+<main class="wrap">
+  <div class="grid">
+    <section class="sec">
+      <header><h2>倉庫概況<small id="dayLabel"></small></h2></header>
+      <dl class="figs" id="figs"></dl>
+    </section>
+
+    <div class="grid two">
+      <div class="stack">
+        <section class="sec">
+          <header>
+            <h2>庫存水位<small>M3・M6</small></h2>
+            <div class="seg" role="group" aria-label="分類">
+              <button type="button" data-cat="全部" aria-pressed="true">全部</button>
+              <button type="button" data-cat="原料" aria-pressed="false">原料</button>
+              <button type="button" data-cat="包材" aria-pressed="false">包材</button>
+            </div>
+          </header>
+          <div class="panel tbl-wrap"><table class="ledger" id="stockTable"></table></div>
+          <p class="note">叫貨點 ＝ 日均需求 × 廠商交期 ＋ 安全庫存。日均需求包含各店撥補與中央工廠領料。</p>
+        </section>
+
+        <section class="sec">
+          <header><h2>建議叫貨單<small>M7</small></h2><span class="aside">依目標庫存與最小訂購量進位</span></header>
+          <div class="panel tbl-wrap"><table class="ledger" id="poTable"></table></div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="sec">
+          <header><h2>撥補出貨</h2></header>
+          <div class="steps" id="trSteps"></div>
+          <div class="panel" style="margin-top:12px"><ul class="list" id="shipList"></ul></div>
+        </section>
+
+        <section class="sec">
+          <header><h2>中央工廠領料</h2><span class="aside">依今日煮製桶數自動扣帳</span></header>
+          <div class="panel"><ul class="list" id="issue"></ul></div>
+        </section>
+
+        <section class="sec">
+          <header><h2>倉庫作業</h2></header>
+          <div class="tiles" id="ops"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+</main>
+<div id="foot"></div>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  var E = ERP;
+  E.header({ code: 'wh', title: '總部倉庫', sub: '現場作業：入庫、撥補出貨、盤點、叫貨' });
+  E.footer();
+  E.$('#dayLabel').textContent = '示意日 ' + E.DAY;
+
+  var rows = E.WAREHOUSE.map(function (it) { return { it: it, s: E.whStatus(it) }; });
+  var need = rows.filter(function (r) { return r.s.state !== 'ok'; });
+  var toShip = E.TRANSFERS.filter(function (t) { return t.status === '已審核'; });
+  var transit = rows.filter(function (r) { return r.it.inTransit > 0; });
+  E.$('#figs').innerHTML =
+    '<div class="fig"><dt>管理品項</dt><dd>' + rows.length + '<small>項</small></dd><span class="delta">原料與包材</span></div>' +
+    '<div class="fig"><dt>需叫貨</dt><dd>' + need.length + '<small>項</small></dd><span class="delta ' + (need.length ? 'down' : '') + '">' + (need.filter(function (r) { return r.s.state === 'bad'; }).length) + ' 項已低於安全庫存</span></div>' +
+    '<div class="fig"><dt>待出貨撥補單</dt><dd>' + toShip.length + '<small>張</small></dd><span class="delta">已由總部審核</span></div>' +
+    '<div class="fig"><dt>廠商在途</dt><dd>' + transit.length + '<small>項</small></dd><span class="delta">已下單未到貨</span></div>';
+
+  var cat = '全部';
+  function renderStock() {
+    var list = rows.filter(function (r) { return cat === '全部' || r.it.cat === cat; });
+    E.$('#stockTable').innerHTML = '<thead><tr><th>品項</th><th class="n">現有</th><th class="n">在途</th><th>水位</th><th class="n">可用天數</th><th>狀態</th></tr></thead><tbody>' +
+      list.map(function (r) {
+        var it = r.it, s = r.s, max = it.target * 1.1;
+        return '<tr><td class="name">' + it.name + '<div class="muted">' + it.code + '・' + it.supplier + '</div></td>' +
+          '<td class="n">' + E.num(it.onHand) + ' ' + it.unit + '</td><td class="n">' + (it.inTransit ? E.num(it.inTransit) : '—') + '</td>' +
+          '<td class="lvl-cell"><div class="level-bar"><i class="' + (s.state === 'ok' ? '' : s.state) + '" style="width:' + Math.min(100, it.onHand / max * 100) + '%"></i>' +
+          '<span class="safe" style="left:' + Math.min(100, s.rop / max * 100) + '%" title="叫貨點"></span></div></td>' +
+          '<td class="n">' + E.num(s.cover, 1) + ' 天</td>' +
+          '<td>' + E.chip(s.state, s.state === 'bad' ? '低於安全庫存' : s.state === 'warn' ? '已到叫貨點' : '充足') + '</td></tr>';
+      }).join('') + '</tbody>';
+  }
+  document.querySelectorAll('[data-cat]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      cat = b.dataset.cat;
+      document.querySelectorAll('[data-cat]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      renderStock();
+    });
+  });
+  renderStock();
+
+  E.$('#poTable').innerHTML = '<thead><tr><th>品項</th><th>廠商</th><th class="n">交期</th><th class="n">現有＋在途</th><th class="n">叫貨點</th><th class="n">建議叫貨</th></tr></thead><tbody>' +
+    (need.map(function (r) {
+      var it = r.it, s = r.s;
+      return '<tr><td class="name">' + it.name + '</td><td>' + it.supplier + '</td><td class="n">' + it.lead + ' 天</td>' +
+        '<td class="n">' + E.num(s.avail) + '</td><td class="n">' + E.num(s.rop, 1) + '</td><td class="n"><b>' + E.num(s.suggest) + ' ' + it.unit + '</b></td></tr>';
+    }).join('') || '<tr><td colspan="6" class="muted">目前沒有需要叫貨的品項</td></tr>') + '</tbody>';
+
+  E.$('#trSteps').innerHTML = E.TR_FLOW.map(function (s) {
+    var n = E.TRANSFERS.filter(function (t) { return t.status === s; }).length;
+    return '<div class="' + (s === '已審核' && n ? 'hot' : '') + '"><b>' + n + '</b><span>' + s + '</span></div>';
+  }).join('');
+  var ship = E.TRANSFERS.filter(function (t) { return t.status === '已審核' || t.status === '已出貨'; });
+  E.$('#shipList').innerHTML = ship.map(function (t) {
+    var act = t.status === '已審核' ? '<button class="btn" type="button" data-no="' + t.no + '">出貨</button>' : E.chip('idle', '在途');
+    return '<li><div class="main"><b>' + t.no + ' → ' + E.loc(t.to).name + '</b><p>' + t.lines + ' 項・' + t.note + '</p></div><div class="end">' + act + '</div></li>';
+  }).join('');
+  E.$('#shipList').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    b.outerHTML = E.chip('idle', '在途');
+    E.toast(b.dataset.no + ' 已出貨（示意）');
+  });
+
+  var F = E.FACTORY, batchesToday = 1;
+  E.$('#issue').innerHTML = F.recipePerBatch.map(function (r) {
+    return '<li><span>' + r.name + '</span><span><b>−' + E.num(r.qty * batchesToday, 1) + ' ' + r.unit + '</b><span class="muted">（' + batchesToday + ' 桶）</span></span></li>';
+  }).join('') + '<li class="muted small">工廠配方待填，用量為示意</li>';
+
+  var ops = [['廠商入庫', '進貨驗收、批號效期'], ['撥補出貨', '依審核單撿貨出車'], ['倉庫盤點', '實盤校正帳面'], ['叫貨單', '轉成採購單給廠商'], ['報廢登記', '過期或損壞']];
+  E.$('#ops').innerHTML = ops.map(function (o) {
+    return '<button type="button" class="tile soon" aria-disabled="true"><span class="code">建置中</span><b>' + o[0] + '</b><span>' + o[1] + '</span></button>';
+  }).join('');
+})();
+</script>
+</body>
+</html>

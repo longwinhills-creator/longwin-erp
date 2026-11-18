@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>昌平店｜瀧飲山丘</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .report { display: grid; gap: 10px; }
+  .report .line { display: grid; grid-template-columns: minmax(0, 1fr) 140px 36px; gap: 10px; align-items: center; font-size: var(--step--1); }
+  .report input { width: 100%; padding: 7px 8px; border: 1px solid var(--rule-strong); border-radius: var(--radius); background: var(--paper); color: var(--ink); font: inherit; text-align: right; }
+  .stock-item { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px dashed var(--rule); }
+  .stock-item:last-child { border-bottom: 0; }
+  .file-ok { font-size: var(--step--1); color: var(--ok); }
+</style>
+</head>
+<body>
+<div id="plaque"></div>
+<main class="wrap">
+  <div class="grid">
+    <section class="sec">
+      <header><h2>今日作業<small id="dayLabel"></small></h2></header>
+      <dl class="figs" id="figs"></dl>
+    </section>
+
+    <div class="grid two">
+      <div class="stack">
+        <section class="sec">
+          <header><h2>上傳今日 POS 營業報表</h2><span class="aside" id="posName"></span></header>
+          <label class="drop" id="drop" for="posFile">
+            <b>點這裡選擇檔案，或把報表拖進來</b>
+            <span>收班後上傳，總部會依銷售品項計算耗用、庫存與損益</span>
+            <span class="muted">接受 Excel、CSV</span>
+            <input type="file" id="posFile" accept=".xlsx,.xls,.csv">
+          </label>
+          <p class="file-ok" id="fileMsg" hidden></p>
+        </section>
+
+        <section class="sec">
+          <header><h2>收班回報</h2><span class="aside">照 POS 日結單和實際狀況填寫</span></header>
+          <div class="panel"><div class="report" id="report"></div></div>
+          <p class="note">填實際看到的數字就好，總部會自動和 POS 報表比對。</p>
+        </section>
+
+        <section class="sec">
+          <header><h2>門店庫存<small>帳面值</small></h2><span class="aside">直線為安全庫存</span></header>
+          <div class="panel" id="stock"></div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="sec">
+          <header><h2>撥補到貨</h2></header>
+          <div class="panel"><ul class="list" id="inbound"></ul></div>
+        </section>
+
+        <section class="sec">
+          <header><h2>月底盤點<small>M5</small></h2></header>
+          <div class="panel">
+            <div class="muted small">本月盤點時間</div>
+            <ul class="list small" id="meList"></ul>
+            <p class="note">21:00 打烊後到隔天開店前都沒有營業，兩次盤點的數字應該一致。不一致時系統會請你複查。</p>
+          </div>
+        </section>
+
+        <section class="sec">
+          <header><h2>日常作業</h2><span class="aside">新模組完成前沿用舊系統</span></header>
+          <div class="tiles" id="legacy"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+</main>
+<div id="foot"></div>
+<script src="assets/app.js"></script>
+<script src="assets/store.js"></script>
+<script>ERP.renderStore('changping');</script>
+</body>
+</html>
